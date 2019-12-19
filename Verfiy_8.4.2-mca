@@ -1,0 +1,1575 @@
+Pre-config:
+Before doing the recovery using SNMP, the net-snmp service must be installed and configured:
+1. Stop snmpd service:
+[root@mca ~]# service snmpd stop
+2. Create user:
+[root@mca ~]# net-snmp-create-v3-user
+Enter a SNMPv3 user name to create: 
+nvradm
+Enter authentication pass-phrase: 
+nec12345
+Enter encryption pass-phrase: 
+  [press return to reuse the authentication pass-phrase]
+nec12345
+adding the following line to /var/lib/net-snmp/snmpd.conf:
+   createUser nvradm MD5 "nec12345" DES nec12345
+adding the following line to /etc/snmp/snmpd.conf:
+   rwuser nvradm
+*************************
+3.	On VM A, switch to root user. Create public and private keys using ssh-key-gen.
+
+[root@mca ~]# ssh-keygen
+Generating public/private rsa key pair.
+Enter file in which to save the key (/root/.ssh/id_rsa): 
+Enter passphrase (empty for no passphrase): 
+Enter same passphrase again: 
+Your identification has been saved in /root/.ssh/id_rsa.
+Your public key has been saved in /root/.ssh/id_rsa.pub.
+The key fingerprint is:
+04:e1:85:d7:d5:d3:6f:d6:9d:aa:8a:c9:e8:8a:9a:09 root@mca
+The key's randomart image is:
++--[ RSA 2048]----+
+|      oo.. ... . |
+|     ..o. .   o .|
+|      ...      .=|
+|       .       .*|
+|        S     .o |
+|             .   |
+|E           .    |
+|.o.   o o  .     |
+|=. .oo + ..      |
++-----------------+
+[root@mca ~]# 
+[root@mca ~]# 
+************************
+4.	Copy the public key to VM B using ssh-copy-id.
+[root@mca ~]# ssh-copy-id -i ~/.ssh/id_rsa.pub mcb
+/usr/bin/ssh-copy-id: INFO: attempting to log in with the new key(s), to filter out any that are already installed
+/usr/bin/ssh-copy-id: INFO: 1 key(s) remain to be installed -- if you are prompted now it is to install the new keys
+root@mcb's password: 
+
+Number of key(s) added: 1
+
+Now try logging into the machine, with:   "ssh 'mcb'"
+and check to make sure that only the key(s) you wanted were added.
+
+*************************
+
+5.	Perform the above steps on VM B. Switch to root user. Create public and private keys using ssh-key-gen.
+[root@mca ~]# 
+[root@mca ~]# 
+[root@mca ~]# ssh mcb
+Last login: Thu Sep 14 19:21:23 2017 from mca
+[root@mcb ~]# 
+[root@mcb ~]# 
+[root@mcb ~]# ssh-keygen
+Generating public/private rsa key pair.
+Enter file in which to save the key (/root/.ssh/id_rsa): 
+Enter passphrase (empty for no passphrase): 
+Enter same passphrase again: 
+Your identification has been saved in /root/.ssh/id_rsa.
+Your public key has been saved in /root/.ssh/id_rsa.pub.
+The key fingerprint is:
+29:82:36:a0:8b:fb:b6:20:fe:4f:79:ba:45:3e:b0:84 root@mcb
+The key's randomart image is:
++--[ RSA 2048]----+
+|                 |
+|                 |
+|.                |
+|.. ..    .       |
+|. +E.o..S        |
+|.o ...*.         |
+|=    + =         |
+|oo. . + .        |
+|.++o.+.          |
++-----------------+
+
+*************************
+
+5.	Copy the public key to VM A using ssh-copy-id.
+[root@mcb ~]# ssh-copy-id -i ~/.ssh/id_rsa.pub mca
+/usr/bin/ssh-copy-id: INFO: attempting to log in with the new key(s), to filter out any that are already installed
+/usr/bin/ssh-copy-id: INFO: 1 key(s) remain to be installed -- if you are prompted now it is to install the new keys
+root@mca's password: 
+
+Number of key(s) added: 1
+
+Now try logging into the machine, with:   "ssh 'mca'"
+and check to make sure that only the key(s) you wanted were added.
+
+*************************
+5.	On VM A, add following line to /etc/snmp/snmpd.conf file:
+[root@mcb ~]# 
+[root@mcb ~]# 
+[root@mcb ~]# ssh mca
+Last login: Thu Sep 14 19:34:36 2017 from 10.213.120.6
+[root@mca ~]# exit
+logout
+[root@mca ~]vi /etc/snmp/snmpd.conf
+
+###############################################################################
+#
+# snmpd.conf:
+#   An example configuration file for configuring the ucd-snmp snmpd agent.
+#
+###############################################################################
+#
+# This file is intended to only be as a starting point.  Many more
+# configuration directives exist than are mentioned in this file.  For 
+# full details, see the snmpd.conf(5) manual page.
+#
+# All lines beginning with a '#' are comments and are intended for you
+# to read.  All other lines are configuration commands for the agent.
+
+###############################################################################
+# Access Control
+###############################################################################
+
+# As shipped, the snmpd demon will only respond to queries on the
+# system mib group until this file is replaced or modified for
+# security purposes.  Examples are shown below about how to increase the
+# level of access.
+
+# By far, the most common question I get about the agent is "why won't
+# it work?", when really it should be "how do I configure the agent to
+# allow me to access it?"
+#
+# By default, the agent responds to the "public" community for read
+# only access, if run out of the box without any configuration file in 
+# place.  The following examples show you other ways of configuring
+# the agent so that you can change the community names, and give
+# yourself write access to the mib tree as well.
+#
+# For more information, read the FAQ as well as the snmpd.conf(5)
+# manual page.
+
+####
+# First, map the community name "public" into a "security name"
+
+#       sec.name  source          community
+com2sec notConfigUser  default       public
+
+####
+# Second, map the security name into a group name:
+
+#       groupName      securityModel securityName
+group   notConfigGroup v1           notConfigUser
+group   notConfigGroup v2c           notConfigUser
+
+####
+# Third, create a view for us to let the group have rights to:
+
+# Make at least  snmpwalk -v 1 localhost -c public system fast again.
+#       name           incl/excl     subtree         mask(optional)
+view    systemview    included   .1.3.6.1.2.1.1
+view    systemview    included   .1.3.6.1.2.1.25.1.1
+
+####
+# Finally, grant the group read-only access to the systemview view.
+
+#       group          context sec.model sec.level prefix read   write  notif
+access  notConfigGroup ""      any       noauth    exact  systemview none none
+
+# -----------------------------------------------------------------------------
+
+# Here is a commented out example configuration that allows less
+# restrictive access.
+
+# YOU SHOULD CHANGE THE "COMMUNITY" TOKEN BELOW TO A NEW KEYWORD ONLY
+# KNOWN AT YOUR SITE.  YOU *MUST* CHANGE THE NETWORK TOKEN BELOW TO
+# SOMETHING REFLECTING YOUR LOCAL NETWORK ADDRESS SPACE.
+
+##       sec.name  source          community
+#com2sec local     localhost       COMMUNITY
+#com2sec mynetwork NETWORK/24      COMMUNITY
+
+##     group.name sec.model  sec.name
+#group MyRWGroup  any        local
+#group MyROGroup  any        mynetwork
+#
+#group MyRWGroup  any        otherv3user
+#...
+
+##           incl/excl subtree                          mask
+#view all    included  .1                               80
+
+## -or just the mib2 tree-
+
+#view mib2   included  .iso.org.dod.internet.mgmt.mib-2 fc
+
+
+##                context sec.model sec.level prefix read   write  notif
+#access MyROGroup ""      any       noauth    0      all    none   none
+#access MyRWGroup ""      any       noauth    0      all    all    all
+
+
+###############################################################################
+# Sample configuration to make net-snmpd RFC 1213.
+# Unfortunately v1 and v2c don't allow any user based authentification, so
+# opening up the default config is not an option from a security point.
+#
+# WARNING: If you uncomment the following lines you allow write access to your
+# snmpd daemon from any source! To avoid this use different names for your
+# community or split out the write access to a different community and 
+# restrict it to your local network.
+# Also remember to comment the syslocation and syscontact parameters later as
+# otherwise they are still read only (see FAQ for net-snmp).
+#
+
+# First, map the community name "public" into a "security name"
+#       sec.name        source          community
+#com2sec notConfigUser   default         public
+
+# Second, map the security name into a group name:
+#       groupName       securityModel   securityName
+#group   notConfigGroup  v1              notConfigUser
+#group   notConfigGroup  v2c             notConfigUser
+
+# Third, create a view for us to let the group have rights to:
+# Open up the whole tree for ro, make the RFC 1213 required ones rw.
+#       name            incl/excl       subtree mask(optional)
+#view    roview          included        .1
+#view    rwview          included        system.sysContact
+#view    rwview          included        system.sysName
+#view    rwview          included        system.sysLocation
+#view    rwview          included        interfaces.ifTable.ifEntry.ifAdminStatus
+#view    rwview          included        at.atTable.atEntry.atPhysAddress
+#view    rwview          included        at.atTable.atEntry.atNetAddress
+#view    rwview          included        ip.ipForwarding
+#view    rwview          included        ip.ipDefaultTTL
+#view    rwview          included        ip.ipRouteTable.ipRouteEntry.ipRouteDest
+#view    rwview          included        ip.ipRouteTable.ipRouteEntry.ipRouteIfIndex
+#view    rwview          included        ip.ipRouteTable.ipRouteEntry.ipRouteMetric1
+#view    rwview          included        ip.ipRouteTable.ipRouteEntry.ipRouteMetric2
+#view    rwview          included        ip.ipRouteTable.ipRouteEntry.ipRouteMetric3
+#view    rwview          included        ip.ipRouteTable.ipRouteEntry.ipRouteMetric4
+#view    rwview          included        ip.ipRouteTable.ipRouteEntry.ipRouteType
+#view    rwview          included        ip.ipRouteTable.ipRouteEntry.ipRouteAge
+#view    rwview          included        ip.ipRouteTable.ipRouteEntry.ipRouteMask
+#view    rwview          included        ip.ipRouteTable.ipRouteEntry.ipRouteMetric5
+#view    rwview          included        ip.ipNetToMediaTable.ipNetToMediaEntry.ipNetToMediaIfIndex
+#view    rwview          included        ip.ipNetToMediaTable.ipNetToMediaEntry.ipNetToMediaPhysAddress
+#view    rwview          included        ip.ipNetToMediaTable.ipNetToMediaEntry.ipNetToMediaNetAddress
+#view    rwview          included        ip.ipNetToMediaTable.ipNetToMediaEntry.ipNetToMediaType
+#view    rwview          included        tcp.tcpConnTable.tcpConnEntry.tcpConnState
+#view    rwview          included        egp.egpNeighTable.egpNeighEntry.egpNeighEventTrigger
+#view    rwview          included        snmp.snmpEnableAuthenTraps
+
+# Finally, grant the group read-only access to the systemview view.
+#       group          context sec.model sec.level prefix read   write  notif
+#access  notConfigGroup ""      any       noauth    exact  roview rwview none
+
+
+
+###############################################################################
+# System contact information
+#
+
+# It is also possible to set the sysContact and sysLocation system
+# variables through the snmpd.conf file:
+
+syslocation Unknown (edit /etc/snmp/snmpd.conf)
+syscontact Root <root@localhost> (configure /etc/snmp/snmp.local.conf)
+
+# Example output of snmpwalk:
+#   % snmpwalk -v 1 localhost -c public system
+#   system.sysDescr.0 = "SunOS name sun4c"
+#   system.sysObjectID.0 = OID: enterprises.ucdavis.ucdSnmpAgent.sunos4
+#   system.sysUpTime.0 = Timeticks: (595637548) 68 days, 22:32:55
+#   system.sysContact.0 = "Me <me@somewhere.org>"
+#   system.sysName.0 = "name"
+#   system.sysLocation.0 = "Right here, right now."
+#   system.sysServices.0 = 72
+
+
+###############################################################################
+# Logging
+#
+
+# We do not want annoying "Connection from UDP: " messages in syslog.
+# If the following option is commented out, snmpd will print each incoming
+# connection, which can be useful for debugging.
+
+dontLogTCPWrappersConnects yes
+
+# -----------------------------------------------------------------------------
+
+
+###############################################################################
+# Process checks.
+#
+#  The following are examples of how to use the agent to check for
+#  processes running on the host.  The syntax looks something like:
+#
+#  proc NAME [MAX=0] [MIN=0]
+#
+#  NAME:  the name of the process to check for.  It must match
+#         exactly (ie, http will not find httpd processes).
+#  MAX:   the maximum number allowed to be running.  Defaults to 0.
+#  MIN:   the minimum number to be running.  Defaults to 0.
+
+#
+#  Examples (commented out by default):
+#
+
+#  Make sure mountd is running
+#proc mountd
+
+#  Make sure there are no more than 4 ntalkds running, but 0 is ok too.
+#proc ntalkd 4
+
+#  Make sure at least one sendmail, but less than or equal to 10 are running.
+#proc sendmail 10 1
+
+#  A snmpwalk of the process mib tree would look something like this:
+# 
+# % snmpwalk -v 1 localhost -c public .1.3.6.1.4.1.2021.2
+# enterprises.ucdavis.procTable.prEntry.prIndex.1 = 1
+# enterprises.ucdavis.procTable.prEntry.prIndex.2 = 2
+# enterprises.ucdavis.procTable.prEntry.prIndex.3 = 3
+# enterprises.ucdavis.procTable.prEntry.prNames.1 = "mountd"
+# enterprises.ucdavis.procTable.prEntry.prNames.2 = "ntalkd"
+# enterprises.ucdavis.procTable.prEntry.prNames.3 = "sendmail"
+# enterprises.ucdavis.procTable.prEntry.prMin.1 = 0
+# enterprises.ucdavis.procTable.prEntry.prMin.2 = 0
+# enterprises.ucdavis.procTable.prEntry.prMin.3 = 1
+# enterprises.ucdavis.procTable.prEntry.prMax.1 = 0
+# enterprises.ucdavis.procTable.prEntry.prMax.2 = 4
+# enterprises.ucdavis.procTable.prEntry.prMax.3 = 10
+# enterprises.ucdavis.procTable.prEntry.prCount.1 = 0
+# enterprises.ucdavis.procTable.prEntry.prCount.2 = 0
+# enterprises.ucdavis.procTable.prEntry.prCount.3 = 1
+# enterprises.ucdavis.procTable.prEntry.prErrorFlag.1 = 1
+# enterprises.ucdavis.procTable.prEntry.prErrorFlag.2 = 0
+# enterprises.ucdavis.procTable.prEntry.prErrorFlag.3 = 0
+# enterprises.ucdavis.procTable.prEntry.prErrMessage.1 = "No mountd process running."
+# enterprises.ucdavis.procTable.prEntry.prErrMessage.2 = ""
+# enterprises.ucdavis.procTable.prEntry.prErrMessage.3 = ""
+# enterprises.ucdavis.procTable.prEntry.prErrFix.1 = 0
+# enterprises.ucdavis.procTable.prEntry.prErrFix.2 = 0
+# enterprises.ucdavis.procTable.prEntry.prErrFix.3 = 0
+#
+#  Note that the errorFlag for mountd is set to 1 because one is not
+#  running (in this case an rpc.mountd is, but thats not good enough),
+#  and the ErrMessage tells you what's wrong.  The configuration
+#  imposed in the snmpd.conf file is also shown.  
+# 
+#  Special Case:  When the min and max numbers are both 0, it assumes
+#  you want a max of infinity and a min of 1.
+#
+
+
+# -----------------------------------------------------------------------------
+
+
+###############################################################################
+# Executables/scripts
+#
+
+#
+#  You can also have programs run by the agent that return a single
+#  line of output and an exit code.  Here are two examples.
+#
+#  exec NAME PROGRAM [ARGS ...]
+#
+#  NAME:     A generic name. The name must be unique for each exec statement.
+#  PROGRAM:  The program to run.  Include the path!
+#  ARGS:     optional arguments to be passed to the program
+
+# a simple hello world
+
+#exec echotest /bin/echo hello world
+
+# Run a shell script containing:
+#
+# #!/bin/sh
+# echo hello world
+# echo hi there
+# exit 35
+#
+# Note:  this has been specifically commented out to prevent
+# accidental security holes due to someone else on your system writing
+# a /tmp/shtest before you do.  Uncomment to use it.
+#
+#exec shelltest /bin/sh /tmp/shtest
+
+# Then, 
+# % snmpwalk -v 1 localhost -c public .1.3.6.1.4.1.2021.8
+# enterprises.ucdavis.extTable.extEntry.extIndex.1 = 1
+# enterprises.ucdavis.extTable.extEntry.extIndex.2 = 2
+# enterprises.ucdavis.extTable.extEntry.extNames.1 = "echotest"
+# enterprises.ucdavis.extTable.extEntry.extNames.2 = "shelltest"
+# enterprises.ucdavis.extTable.extEntry.extCommand.1 = "/bin/echo hello world"
+# enterprises.ucdavis.extTable.extEntry.extCommand.2 = "/bin/sh /tmp/shtest"
+# enterprises.ucdavis.extTable.extEntry.extResult.1 = 0
+# enterprises.ucdavis.extTable.extEntry.extResult.2 = 35
+# enterprises.ucdavis.extTable.extEntry.extOutput.1 = "hello world."
+# enterprises.ucdavis.extTable.extEntry.extOutput.2 = "hello world."
+# enterprises.ucdavis.extTable.extEntry.extErrFix.1 = 0
+# enterprises.ucdavis.extTable.extEntry.extErrFix.2 = 0
+
+# Note that the second line of the /tmp/shtest shell script is cut
+# off.  Also note that the exit status of 35 was returned.
+
+# -----------------------------------------------------------------------------
+
+
+###############################################################################
+# disk checks
+#
+
+# The agent can check the amount of available disk space, and make
+# sure it is above a set limit.  
+
+# disk PATH [MIN=100000]
+#
+# PATH:  mount path to the disk in question.
+# MIN:   Disks with space below this value will have the Mib's errorFlag set.
+#        Default value = 100000.
+
+# Check the / partition and make sure it contains at least 10 megs.
+
+#disk / 10000
+
+# % snmpwalk -v 1 localhost -c public .1.3.6.1.4.1.2021.9
+# enterprises.ucdavis.diskTable.dskEntry.diskIndex.1 = 0
+# enterprises.ucdavis.diskTable.dskEntry.diskPath.1 = "/" Hex: 2F 
+# enterprises.ucdavis.diskTable.dskEntry.diskDevice.1 = "/dev/dsk/c201d6s0"
+# enterprises.ucdavis.diskTable.dskEntry.diskMinimum.1 = 10000
+# enterprises.ucdavis.diskTable.dskEntry.diskTotal.1 = 837130
+# enterprises.ucdavis.diskTable.dskEntry.diskAvail.1 = 316325
+# enterprises.ucdavis.diskTable.dskEntry.diskUsed.1 = 437092
+# enterprises.ucdavis.diskTable.dskEntry.diskPercent.1 = 58
+# enterprises.ucdavis.diskTable.dskEntry.diskErrorFlag.1 = 0
+# enterprises.ucdavis.diskTable.dskEntry.diskErrorMsg.1 = ""
+
+# -----------------------------------------------------------------------------
+
+
+###############################################################################
+# load average checks
+#
+
+# load [1MAX=12.0] [5MAX=12.0] [15MAX=12.0]
+#
+# 1MAX:   If the 1 minute load average is above this limit at query
+#         time, the errorFlag will be set.
+# 5MAX:   Similar, but for 5 min average.
+# 15MAX:  Similar, but for 15 min average.
+
+# Check for loads:
+#load 12 14 14
+
+# % snmpwalk -v 1 localhost -c public .1.3.6.1.4.1.2021.10
+# enterprises.ucdavis.loadTable.laEntry.loadaveIndex.1 = 1
+# enterprises.ucdavis.loadTable.laEntry.loadaveIndex.2 = 2
+# enterprises.ucdavis.loadTable.laEntry.loadaveIndex.3 = 3
+# enterprises.ucdavis.loadTable.laEntry.loadaveNames.1 = "Load-1"
+# enterprises.ucdavis.loadTable.laEntry.loadaveNames.2 = "Load-5"
+# enterprises.ucdavis.loadTable.laEntry.loadaveNames.3 = "Load-15"
+# enterprises.ucdavis.loadTable.laEntry.loadaveLoad.1 = "0.49" Hex: 30 2E 34 39 
+# enterprises.ucdavis.loadTable.laEntry.loadaveLoad.2 = "0.31" Hex: 30 2E 33 31 
+# enterprises.ucdavis.loadTable.laEntry.loadaveLoad.3 = "0.26" Hex: 30 2E 32 36 
+# enterprises.ucdavis.loadTable.laEntry.loadaveConfig.1 = "12.00"
+# enterprises.ucdavis.loadTable.laEntry.loadaveConfig.2 = "14.00"
+# enterprises.ucdavis.loadTable.laEntry.loadaveConfig.3 = "14.00"
+# enterprises.ucdavis.loadTable.laEntry.loadaveErrorFlag.1 = 0
+# enterprises.ucdavis.loadTable.laEntry.loadaveErrorFlag.2 = 0
+# enterprises.ucdavis.loadTable.laEntry.loadaveErrorFlag.3 = 0
+# enterprises.ucdavis.loadTable.laEntry.loadaveErrMessage.1 = ""
+# enterprises.ucdavis.loadTable.laEntry.loadaveErrMessage.2 = ""
+# enterprises.ucdavis.loadTable.laEntry.loadaveErrMessage.3 = ""
+
+# -----------------------------------------------------------------------------
+
+
+###############################################################################
+# Extensible sections.
+# 
+
+# This alleviates the multiple line output problem found in the
+# previous executable mib by placing each mib in its own mib table:
+
+# Run a shell script containing:
+#
+# #!/bin/sh
+# echo hello world
+# echo hi there
+# exit 35
+#
+# Note:  this has been specifically commented out to prevent
+# accidental security holes due to someone else on your system writing
+# a /tmp/shtest before you do.  Uncomment to use it.
+#
+# exec .1.3.6.1.4.1.2021.50 shelltest /bin/sh /tmp/shtest
+
+# % snmpwalk -v 1 localhost -c public .1.3.6.1.4.1.2021.50
+# enterprises.ucdavis.50.1.1 = 1
+# enterprises.ucdavis.50.2.1 = "shelltest"
+# enterprises.ucdavis.50.3.1 = "/bin/sh /tmp/shtest"
+# enterprises.ucdavis.50.100.1 = 35
+# enterprises.ucdavis.50.101.1 = "hello world."
+# enterprises.ucdavis.50.101.2 = "hi there."
+# enterprises.ucdavis.50.102.1 = 0
+
+# Now the Output has grown to two lines, and we can see the 'hi
+# there.' output as the second line from our shell script.
+#
+# Note that you must alter the mib.txt file to be correct if you want
+# the .50.* outputs above to change to reasonable text descriptions.
+
+# Other ideas:
+# 
+# exec .1.3.6.1.4.1.2021.51 ps /bin/ps 
+# exec .1.3.6.1.4.1.2021.52 top /usr/local/bin/top
+# exec .1.3.6.1.4.1.2021.53 mailq /usr/bin/mailq
+
+# -----------------------------------------------------------------------------
+
+
+###############################################################################
+# Pass through control.
+# 
+
+# Usage:
+#   pass MIBOID EXEC-COMMAND
+#
+# This will pass total control of the mib underneath the MIBOID
+# portion of the mib to the EXEC-COMMAND.  
+#
+# Note:  You'll have to change the path of the passtest script to your
+# source directory or install it in the given location.
+# 
+# Example:  (see the script for details)
+#           (commented out here since it requires that you place the
+#           script in the right location. (its not installed by default))
+
+# pass .1.3.6.1.4.1.2021.255 /bin/sh /usr/local/local/passtest
+
+# % snmpwalk -v 1 localhost -c public .1.3.6.1.4.1.2021.255
+# enterprises.ucdavis.255.1 = "life the universe and everything"
+# enterprises.ucdavis.255.2.1 = 42
+# enterprises.ucdavis.255.2.2 = OID: 42.42.42
+# enterprises.ucdavis.255.3 = Timeticks: (363136200) 42 days, 0:42:42
+# enterprises.ucdavis.255.4 = IpAddress: 127.0.0.1
+# enterprises.ucdavis.255.5 = 42
+# enterprises.ucdavis.255.6 = Gauge: 42
+#
+# % snmpget -v 1 localhost public .1.3.6.1.4.1.2021.255.5
+# enterprises.ucdavis.255.5 = 42
+#
+# % snmpset -v 1 localhost public .1.3.6.1.4.1.2021.255.1 s "New string"
+# enterprises.ucdavis.255.1 = "New string"
+#
+
+# For specific usage information, see the man/snmpd.conf.5 manual page
+# as well as the local/passtest script used in the above example.
+
+###############################################################################
+# Further Information
+#
+#  See the snmpd.conf manual page, and the output of "snmpd -H".
+
+exec jboss /usr/local/bin/perl /nec/nvrmc/nvrmc/bin/nvrmc_monitor.pl
+
+# Set up the credentials to retrieve monitored values
+createUser    _internal MD5 "nec12345"
+iquerySecName _internal
+rouser        _internal
+
+# Active the standard monitoring entries
+defaultMonitors         no
+linkUpDownNotifications yes
+monitor -r 10 -o extNames -o extOutput "extTable" extResult 0 1
+monitor -r 600 -I database_replication_trap -o nsExtendOutputFull."get_database_replication" != nsExtendResult."get_database_replication"
+monitor -r 600 -I start_corosync_trap -o nsExtendOutputFull."get_corosync" != nsExtendResult."get_corosync"
+
+# If there's a problem, then tell someone!
+trap2sink 10.212.164.251
+trap2sink 10.213.120.225
+
+extendfix configure_replication /bin/bash /nec/nvrmc/nvrmc/bin/set_configure_replication.sh
+extendfix start_corosync /bin/bash /nec/nvrmc/nvrmc/bin/set_start_corosync.sh
+extend get_database_replication /bin/bash /nec/nvrmc/nvrmc/bin/get_recovery_status.sh /var/log/nvrmc/mcapp/replication_status
+extend get_corosync /bin/bash /nec/nvrmc/nvrmc/bin/get_recovery_status.sh /var/log/nvrmc/mcapp/corosync_status
+extend get_ha_status /usr/sbin/pcs status
+extend get_mysql_slave_status /usr/bin/ssh root@mcb "mysql -e 'show slave status\\G;'"
+extend get_ring_status /usr/sbin/corosync-cfgtool -s 
+extend get_ring_status_mcb /usr/bin/ssh root@mcb "corosync-cfgtool -s"
+extend get_database_status /usr/bin/mysqlcheck --all-databases --user=root --password=nec
+
+rwuser nvradm authpriv .1
+rwuser nvradm
+
+****************************
+
+6.	On VM B, add following line to /etc/snmp/snmpd.conf file:
+
+[nvradm@mcb ~]$ 
+[nvradm@mcb ~]$ 
+[nvradm@mcb ~]$ sudo vi /etc/snmp/snmpd.conf
+[sudo] password for nvradm: 
+###############################################################################
+#
+# snmpd.conf:
+#   An example configuration file for configuring the ucd-snmp snmpd agent.
+#
+###############################################################################
+#
+# This file is intended to only be as a starting point.  Many more
+# configuration directives exist than are mentioned in this file.  For
+# full details, see the snmpd.conf(5) manual page.
+#
+# All lines beginning with a '#' are comments and are intended for you
+# to read.  All other lines are configuration commands for the agent.
+
+###############################################################################
+# Access Control
+###############################################################################
+
+# As shipped, the snmpd demon will only respond to queries on the
+# system mib group until this file is replaced or modified for
+# security purposes.  Examples are shown below about how to increase the
+# level of access.
+
+# By far, the most common question I get about the agent is "why won't
+# it work?", when really it should be "how do I configure the agent to
+# allow me to access it?"
+#
+# By default, the agent responds to the "public" community for read
+# only access, if run out of the box without any configuration file in
+# place.  The following examples show you other ways of configuring
+# the agent so that you can change the community names, and give
+# yourself write access to the mib tree as well.
+#
+# For more information, read the FAQ as well as the snmpd.conf(5)
+# manual page.
+
+####
+# First, map the community name "public" into a "security name"
+
+#       sec.name  source          community
+com2sec notConfigUser  default       public
+
+####
+# Second, map the security name into a group name:
+
+#       groupName      securityModel securityName
+group   notConfigGroup v1           notConfigUser
+group   notConfigGroup v2c           notConfigUser
+
+####
+# Third, create a view for us to let the group have rights to:
+
+# Make at least  snmpwalk -v 1 localhost -c public system fast again.
+#       name           incl/excl     subtree         mask(optional)
+view    systemview    included   .1.3.6.1.2.1.1
+view    systemview    included   .1.3.6.1.2.1.25.1.1
+
+####
+# Finally, grant the group read-only access to the systemview view.
+
+#       group          context sec.model sec.level prefix read   write  notif
+access  notConfigGroup ""      any       noauth    exact  systemview none none
+
+# -----------------------------------------------------------------------------
+
+
+###############################################################################
+# Pass through control.
+#
+
+# Usage:
+#   pass MIBOID EXEC-COMMAND
+#
+# This will pass total control of the mib underneath the MIBOID
+# portion of the mib to the EXEC-COMMAND.
+#
+# Note:  You'll have to change the path of the passtest script to your
+# source directory or install it in the given location.
+#
+# Example:  (see the script for details)
+#           (commented out here since it requires that you place the
+#           script in the right location. (its not installed by default))
+
+# pass .1.3.6.1.4.1.2021.255 /bin/sh /usr/local/local/passtest
+
+# % snmpwalk -v 1 localhost -c public .1.3.6.1.4.1.2021.255
+# enterprises.ucdavis.255.1 = "life the universe and everything"
+# enterprises.ucdavis.255.2.1 = 42
+# enterprises.ucdavis.255.2.2 = OID: 42.42.42
+# enterprises.ucdavis.255.3 = Timeticks: (363136200) 42 days, 0:42:42
+# enterprises.ucdavis.255.4 = IpAddress: 127.0.0.1
+# enterprises.ucdavis.255.5 = 42
+# enterprises.ucdavis.255.6 = Gauge: 42
+#
+# % snmpget -v 1 localhost public .1.3.6.1.4.1.2021.255.5
+# enterprises.ucdavis.255.5 = 42
+#
+# % snmpset -v 1 localhost public .1.3.6.1.4.1.2021.255.1 s "New string"
+# enterprises.ucdavis.255.1 = "New string"
+#
+
+# For specific usage information, see the man/snmpd.conf.5 manual page
+# as well as the local/passtest script used in the above example.
+
+###############################################################################
+# Further Information
+#
+#  See the snmpd.conf manual page, and the output of "snmpd -H".
+
+exec jboss /usr/local/bin/perl /nec/nvrmc/nvrmc/bin/nvrmc_monitor.pl
+
+# Set up the credentials to retrieve monitored values
+createUser    _internal MD5 "nec12345"
+iquerySecName _internal
+rouser        _internal
+
+# Active the standard monitoring entries
+defaultMonitors         no
+linkUpDownNotifications yes
+monitor -r 10 -o extNames -o extOutput "extTable" extResult 0 1
+
+# If there's a problem, then tell someone!
+trap2sink 10.212.164.251
+trap2sink 10.213.120.225
+
+rwuser nvradm authpriv .1
+
+rwuser nvradm authpriv .1
+rwuser nvradm
+extend get_ha_status /usr/sbin/crm_mon -Af -1
+
+extend get_ring_status_mca /usr/bin/ssh root@mca "corosync-cfgtool -s"
+
+extend get_ring_status_mcb /usr/sbin/corosync-cfgtool -s
+
+************************************
+7.	Check the host name of MC A and MC B in the ha_recovery.conf file located under /nec/nvrmc/nvrmc/config/ :
+[nvradm@mca ~]
+[nvradm@mca ~]$ cat  /nec/nvrmc/nvrmc/config/ha_recovery.conf
+DBNAME=nvrmc
+SQLDUMP=nvrmcdump.sql
+MCA=mca
+MCB=mcb
+MCA_USER=root
+MCA_PASSWORD=nec
+MCB_USER=root
+MCB_PASSWORD=nec
+
+********************
+Step to verify:
+1. Modify each NVR system MIB and verify that the update is synchronised
+1.	From PC B walk the NEC-NVR-DG-MIB on MC A:
+$ snmpwalk -v3 10.213.120.4:1161 NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime
+Result: 
+[tester@TSTPCB ~]$ snmpwalk -v3 10.213.120.4:1161 NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00001'.1 = Gauge32: 0
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00001'.2 = Gauge32: 0
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00001'.3 = Gauge32: 0
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00001'.4 = Gauge32: 0
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00001'.5 = Gauge32: 0
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00001'.6 = Gauge32: 0
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00001'.7 = Gauge32: 0
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00001'.8 = Gauge32: 0
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00002'.1 = Gauge32: 0
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00002'.2 = Gauge32: 0
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00002'.3 = Gauge32: 0
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00002'.4 = Gauge32: 0
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00002'.5 = Gauge32: 0
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00002'.6 = Gauge32: 0
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00002'.7 = Gauge32: 0
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00002'.8 = Gauge32: 0
+2.	From PC B, schedule an NVR DG A user traffic capture script
+[tester@TSTPCB nvr-snmp-test-tool]$ python 46.setDgScriptFile.py -s 1505301367 -e 1505301567 -a 2 g00001 1
+
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime."g00001"."1" = 1505301367
+NEC-NVR-DG-MIB::necNvrDgScriptFileEndTime."g00001"."1" = 1505301567
+NEC-NVR-DG-MIB::necNvrDgScriptFileAction."g00001"."1" = 'schedule' 
+
+3.	From PC B walk the NEC-NVR-DG-MIB on MC A:
+[tester@TSTPCB nvr-snmp-test-tool]$ snmpwalk -v3 10.213.120.4:1161 NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00001'.1 = Gauge32: 1505301367
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00001'.2 = Gauge32: 0
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00001'.3 = Gauge32: 0
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00001'.4 = Gauge32: 0
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00001'.5 = Gauge32: 0
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00001'.6 = Gauge32: 0
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00001'.7 = Gauge32: 0
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00001'.8 = Gauge32: 0
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00002'.1 = Gauge32: 0
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00002'.2 = Gauge32: 0
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00002'.3 = Gauge32: 0
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00002'.4 = Gauge32: 0
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00002'.5 = Gauge32: 0
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00002'.6 = Gauge32: 0
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00002'.7 = Gauge32: 0
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00002'.8 = Gauge32: 0
+4.	From PC B walk the NEC-NVR-MC-MIB on MC A:
+$ snmpwalk -v3 10.213.120.4:1161 NEC-NVR-MC-MIB::necNvrMcTable
+
+5.	From PC B, use the SNMP Test tool to modify the NVR MC A logging level:
+[tester@TSTPCB nvr-snmp-test-tool]$ snmpwalk -v3 10.213.120.4:1161 NEC-NVR-MC-MIB::necNvrMcTable
+NEC-NVR-MC-MIB::necNvrMcId.'m00001' = STRING: "m00001"
+NEC-NVR-MC-MIB::necNvrMcId.'m00002' = STRING: "m00002"
+NEC-NVR-MC-MIB::necNvrMcDesignationId.'m00001' = INTEGER: a(1)
+NEC-NVR-MC-MIB::necNvrMcDesignationId.'m00002' = INTEGER: b(2)
+NEC-NVR-MC-MIB::necNvrMcIPAddress.'m00001' = IpAddress: 10.213.120.115
+NEC-NVR-MC-MIB::necNvrMcIPAddress.'m00002' = IpAddress: 10.213.120.116
+NEC-NVR-MC-MIB::necNvrMcSoftwareVersion.'m00001' = STRING: 7_5B05
+NEC-NVR-MC-MIB::necNvrMcSoftwareVersion.'m00002' = STRING: 7_5B05
+NEC-NVR-MC-MIB::necNvrMcCommunicationAction.'m00001' = INTEGER: online(1)
+NEC-NVR-MC-MIB::necNvrMcCommunicationAction.'m00002' = INTEGER: online(1)
+NEC-NVR-MC-MIB::necNvrMcCommunicationStatus.'m00001' = INTEGER: online(1)
+NEC-NVR-MC-MIB::necNvrMcCommunicationStatus.'m00002' = INTEGER: online(1)
+NEC-NVR-MC-MIB::necNvrMcCommunicationSetStatus.'m00001' = INTEGER: idle(1)
+NEC-NVR-MC-MIB::necNvrMcCommunicationSetStatus.'m00002' = INTEGER: idle(1)
+NEC-NVR-MC-MIB::necNvrMcConfigFileVersion.'m00001' = Hex-STRING: AC 17 4B 74 B5 0A 9D 61 D8 38 9C 9F A7 79 6B D2 
+NEC-NVR-MC-MIB::necNvrMcConfigFileVersion.'m00002' = Hex-STRING: DD C4 FE 11 6A 91 43 2B 37 3E C3 A9 7B A7 CC 0C 
+NEC-NVR-MC-MIB::necNvrMcConfigFileDate.'m00001' = Gauge32: 1505262035
+NEC-NVR-MC-MIB::necNvrMcConfigFileDate.'m00002' = Gauge32: 1505261887
+NEC-NVR-MC-MIB::necNvrMcConfigFileApplyAction.'m00001' = INTEGER: idle(1)
+NEC-NVR-MC-MIB::necNvrMcConfigFileApplyAction.'m00002' = INTEGER: idle(1)
+NEC-NVR-MC-MIB::necNvrMcConfigFileSyncStatus.'m00001' = INTEGER: inSync(2)
+NEC-NVR-MC-MIB::necNvrMcConfigFileSyncStatus.'m00002' = INTEGER: inSync(2)
+NEC-NVR-MC-MIB::necNvrMcConfigFileSyncErrorString.'m00001' = ""
+NEC-NVR-MC-MIB::necNvrMcConfigFileSyncErrorString.'m00002' = ""
+NEC-NVR-MC-MIB::necNvrMcConfigFileSyncLastChanged.'m00001' = Gauge32: 1505262035
+NEC-NVR-MC-MIB::necNvrMcConfigFileSyncLastChanged.'m00002' = Gauge32: 1505261887
+NEC-NVR-MC-MIB::necNvrMcLogFileLogLevel.'m00001' = INTEGER: 4
+NEC-NVR-MC-MIB::necNvrMcLogFileLogLevel.'m00002' = INTEGER: 4
+NEC-NVR-MC-MIB::necNvrMcLogFileLogDepth.'m00001' = Gauge32: 100 kbyte
+NEC-NVR-MC-MIB::necNvrMcLogFileLogDepth.'m00002' = Gauge32: 100000 kbyte
+NEC-NVR-MC-MIB::necNvrMcLogFileLogSetStatus.'m00001' = INTEGER: failed(4)
+NEC-NVR-MC-MIB::necNvrMcLogFileLogSetStatus.'m00002' = INTEGER: idle(1)
+NEC-NVR-MC-MIB::necNvrMcSystemWideLogLevel.'m00001' = INTEGER: 7
+NEC-NVR-MC-MIB::necNvrMcSystemWideLogLevel.'m00002' = INTEGER: 7
+NEC-NVR-MC-MIB::necNvrMcSystemWideLogDepth.'m00001' = Gauge32: 100 kbyte
+NEC-NVR-MC-MIB::necNvrMcSystemWideLogDepth.'m00002' = Gauge32: 100 kbyte
+NEC-NVR-MC-MIB::necNvrMcSystemWideLogSetStatus.'m00001' = INTEGER: idle(1)
+NEC-NVR-MC-MIB::necNvrMcSystemWideLogSetStatus.'m00002' = INTEGER: idle(1)
+
+6.	From PC B walk the NEC-NVR-MC-MIB on MC A:
+[tester@TSTPCB nvr-snmp-test-tool]$ snmpwalk -v3  10.213.120.4:1161   NEC-NVR-MC-MIB::necNvrMcLogFileLogLevel
+NEC-NVR-MC-MIB::necNvrMcLogFileLogLevel.'m00001' = INTEGER: 4
+NEC-NVR-MC-MIB::necNvrMcLogFileLogLevel.'m00002' = INTEGER: 4Result:
+
+7.	From PC B walk the NEC-NVR-CPU-MIB on MC A:
+[tester@TSTPCB nvr-snmp-test-tool]$ snmpwalk -v3 10.213.120.4:1161 NEC-NVR-CPU-MIB::necNvrCpuTable
+NEC-NVR-CPU-MIB::necNvrCpuNvrtId.'t00101'.a = STRING: "t00101"
+NEC-NVR-CPU-MIB::necNvrCpuNvrtId.'t00101'.b = STRING: "t00101"
+NEC-NVR-CPU-MIB::necNvrCpuNvrtId.'t00116'.a = STRING: "t00116"
+NEC-NVR-CPU-MIB::necNvrCpuNvrtId.'t00116'.b = STRING: "t00116"
+NEC-NVR-CPU-MIB::necNvrCpuNvrtId.'t00117'.a = STRING: "t00117"
+NEC-NVR-CPU-MIB::necNvrCpuNvrtId.'t00117'.b = STRING: "t00117"
+NEC-NVR-CPU-MIB::necNvrCpuSlotId.'t00101'.a = INTEGER: a(1)
+NEC-NVR-CPU-MIB::necNvrCpuSlotId.'t00101'.b = INTEGER: b(2)
+NEC-NVR-CPU-MIB::necNvrCpuSlotId.'t00116'.a = INTEGER: a(1)
+NEC-NVR-CPU-MIB::necNvrCpuSlotId.'t00116'.b = INTEGER: b(2)
+NEC-NVR-CPU-MIB::necNvrCpuSlotId.'t00117'.a = INTEGER: a(1)
+NEC-NVR-CPU-MIB::necNvrCpuSlotId.'t00117'.b = INTEGER: b(2)
+NEC-NVR-CPU-MIB::necNvrCpuId.'t00101'.a = STRING: "00002a"
+NEC-NVR-CPU-MIB::necNvrCpuId.'t00101'.b = STRING: "00002b"
+NEC-NVR-CPU-MIB::necNvrCpuId.'t00116'.a = STRING: "000048"
+NEC-NVR-CPU-MIB::necNvrCpuId.'t00116'.b = STRING: "000049"
+NEC-NVR-CPU-MIB::necNvrCpuId.'t00117'.a = STRING: "00004a"
+NEC-NVR-CPU-MIB::necNvrCpuId.'t00117'.b = STRING: "00004b"
+NEC-NVR-CPU-MIB::necNvrCpuSerialNumber.'t00101'.a = STRING: 
+NEC-NVR-CPU-MIB::necNvrCpuSerialNumber.'t00101'.b = STRING: 
+NEC-NVR-CPU-MIB::necNvrCpuSerialNumber.'t00116'.a = STRING: 
+NEC-NVR-CPU-MIB::necNvrCpuSerialNumber.'t00116'.b = STRING: 
+NEC-NVR-CPU-MIB::necNvrCpuSerialNumber.'t00117'.a = STRING: 
+NEC-NVR-CPU-MIB::necNvrCpuSerialNumber.'t00117'.b = STRING: 
+NEC-NVR-CPU-MIB::necNvrCpuHardwareVersion.'t00101'.a = STRING: 
+NEC-NVR-CPU-MIB::necNvrCpuHardwareVersion.'t00101'.b = STRING: 
+NEC-NVR-CPU-MIB::necNvrCpuHardwareVersion.'t00116'.a = STRING: 
+NEC-NVR-CPU-MIB::necNvrCpuHardwareVersion.'t00116'.b = STRING: 
+NEC-NVR-CPU-MIB::necNvrCpuHardwareVersion.'t00117'.a = STRING: 
+NEC-NVR-CPU-MIB::necNvrCpuHardwareVersion.'t00117'.b = STRING: 
+NEC-NVR-CPU-MIB::necNvrCpuFirmwareVersion.'t00101'.a = STRING: nvr-7.5.12-1-6g1
+NEC-NVR-CPU-MIB::necNvrCpuFirmwareVersion.'t00101'.b = STRING: nvr-7.5.12-1-6g1
+NEC-NVR-CPU-MIB::necNvrCpuFirmwareVersion.'t00116'.a = STRING: 1
+NEC-NVR-CPU-MIB::necNvrCpuFirmwareVersion.'t00116'.b = STRING: 1
+NEC-NVR-CPU-MIB::necNvrCpuFirmwareVersion.'t00117'.a = STRING: nvr-7.5.5-1-6
+NEC-NVR-CPU-MIB::necNvrCpuFirmwareVersion.'t00117'.b = STRING: nvr-7.5.5-1-6
+NEC-NVR-CPU-MIB::necNvrCpuManagmentIPAddress.'t00101'.a = IpAddress: 10.213.104.42
+NEC-NVR-CPU-MIB::necNvrCpuManagmentIPAddress.'t00101'.b = IpAddress: 10.213.104.43
+NEC-NVR-CPU-MIB::necNvrCpuManagmentIPAddress.'t00116'.a = IpAddress: 10.213.104.72
+NEC-NVR-CPU-MIB::necNvrCpuManagmentIPAddress.'t00116'.b = IpAddress: 10.213.104.73
+NEC-NVR-CPU-MIB::necNvrCpuManagmentIPAddress.'t00117'.a = IpAddress: 10.213.104.74
+NEC-NVR-CPU-MIB::necNvrCpuManagmentIPAddress.'t00117'.b = IpAddress: 10.213.104.75
+NEC-NVR-CPU-MIB::necNvrCpuOperationalAction.'t00101'.a = INTEGER: idle(1)
+NEC-NVR-CPU-MIB::necNvrCpuOperationalAction.'t00101'.b = INTEGER: idle(1)
+NEC-NVR-CPU-MIB::necNvrCpuOperationalAction.'t00116'.a = INTEGER: idle(1)
+NEC-NVR-CPU-MIB::necNvrCpuOperationalAction.'t00116'.b = INTEGER: idle(1)
+NEC-NVR-CPU-MIB::necNvrCpuOperationalAction.'t00117'.a = INTEGER: idle(1)
+NEC-NVR-CPU-MIB::necNvrCpuOperationalAction.'t00117'.b = INTEGER: idle(1)
+NEC-NVR-CPU-MIB::necNvrCpuOperationalStatus.'t00101'.a = INTEGER: operational(2)
+NEC-NVR-CPU-MIB::necNvrCpuOperationalStatus.'t00101'.b = INTEGER: operational(2)
+NEC-NVR-CPU-MIB::necNvrCpuOperationalStatus.'t00116'.a = INTEGER: operational(2)
+NEC-NVR-CPU-MIB::necNvrCpuOperationalStatus.'t00116'.b = INTEGER: operational(2)
+NEC-NVR-CPU-MIB::necNvrCpuOperationalStatus.'t00117'.a = INTEGER: unknown(1)
+NEC-NVR-CPU-MIB::necNvrCpuOperationalStatus.'t00117'.b = INTEGER: unknown(1)
+NEC-NVR-CPU-MIB::necNvrCpuStatusLastChanged.'t00101'.a = Gauge32: 1505264500
+NEC-NVR-CPU-MIB::necNvrCpuStatusLastChanged.'t00101'.b = Gauge32: 1505264501
+NEC-NVR-CPU-MIB::necNvrCpuStatusLastChanged.'t00116'.a = Gauge32: 1505262059
+NEC-NVR-CPU-MIB::necNvrCpuStatusLastChanged.'t00116'.b = Gauge32: 1505262056
+NEC-NVR-CPU-MIB::necNvrCpuStatusLastChanged.'t00117'.a = Gauge32: 1505262035
+NEC-NVR-CPU-MIB::necNvrCpuStatusLastChanged.'t00117'.b = Gauge32: 1505262035
+NEC-NVR-CPU-MIB::necNvrCpuConfigFileSyncStatus.'t00101'.a = INTEGER: inSync(2)
+NEC-NVR-CPU-MIB::necNvrCpuConfigFileSyncStatus.'t00101'.b = INTEGER: inSync(2)
+NEC-NVR-CPU-MIB::necNvrCpuConfigFileSyncStatus.'t00116'.a = INTEGER: inSync(2)
+NEC-NVR-CPU-MIB::necNvrCpuConfigFileSyncStatus.'t00116'.b = INTEGER: inSync(2)
+NEC-NVR-CPU-MIB::necNvrCpuConfigFileSyncStatus.'t00117'.a = INTEGER: inSync(2)
+NEC-NVR-CPU-MIB::necNvrCpuConfigFileSyncStatus.'t00117'.b = INTEGER: inSync(2)
+NEC-NVR-CPU-MIB::necNvrCpuConfigFileSyncErrorString.'t00101'.a = ""
+NEC-NVR-CPU-MIB::necNvrCpuConfigFileSyncErrorString.'t00101'.b = ""
+NEC-NVR-CPU-MIB::necNvrCpuConfigFileSyncErrorString.'t00116'.a = ""
+NEC-NVR-CPU-MIB::necNvrCpuConfigFileSyncErrorString.'t00116'.b = ""
+NEC-NVR-CPU-MIB::necNvrCpuConfigFileSyncErrorString.'t00117'.a = ""
+NEC-NVR-CPU-MIB::necNvrCpuConfigFileSyncErrorString.'t00117'.b = ""
+NEC-NVR-CPU-MIB::necNvrCpuConfigFileSyncLastChanged.'t00101'.a = Gauge32: 1505264533
+NEC-NVR-CPU-MIB::necNvrCpuConfigFileSyncLastChanged.'t00101'.b = Gauge32: 1505264539
+NEC-NVR-CPU-MIB::necNvrCpuConfigFileSyncLastChanged.'t00116'.a = Gauge32: 1504729569
+NEC-NVR-CPU-MIB::necNvrCpuConfigFileSyncLastChanged.'t00116'.b = Gauge32: 1504729569
+NEC-NVR-CPU-MIB::necNvrCpuConfigFileSyncLastChanged.'t00117'.a = Gauge32: 1504656310
+NEC-NVR-CPU-MIB::necNvrCpuConfigFileSyncLastChanged.'t00117'.b = Gauge32: 1504656308
+NEC-NVR-CPU-MIB::necNvrCpuLocalMaintIfStatus.'t00101'.a = INTEGER: inactive(2)
+NEC-NVR-CPU-MIB::necNvrCpuLocalMaintIfStatus.'t00101'.b = INTEGER: inactive(2)
+NEC-NVR-CPU-MIB::necNvrCpuLocalMaintIfStatus.'t00116'.a = INTEGER: inactive(2)
+NEC-NVR-CPU-MIB::necNvrCpuLocalMaintIfStatus.'t00116'.b = INTEGER: inactive(2)
+NEC-NVR-CPU-MIB::necNvrCpuLocalMaintIfStatus.'t00117'.a = INTEGER: inactive(2)
+NEC-NVR-CPU-MIB::necNvrCpuLocalMaintIfStatus.'t00117'.b = INTEGER: inactive(2)
+
+8.	From the LMCT MCE Simulator connect to the NVR Terminal via SSH.
+$ ssh linaro@192.168.3.2 (không biết LMCT MCE Simulator)
+
+9.	From the MCE Simulator, press Enter, then logon to the NVR Terminal.
+Không biết làm
+
+10.	From PC B walk the NEC-NVR-CPU-MIB on MC A:
+[tester@TSTPCB nvr-snmp-test-tool]$$ snmpwalk -v3 10.213.120.4:1161 NEC-NVR-CPU-MIB::necNvrCpuLocalMaintIfStatus
+snmpwalk -v3 10.213.120.4:1161 NEC-NVR-CPU-MIB::necNvrCpuLocalMaintIfStatus
+NEC-NVR-CPU-MIB::necNvrCpuLocalMaintIfStatus.'t00101'.a = INTEGER: inactive(2)
+NEC-NVR-CPU-MIB::necNvrCpuLocalMaintIfStatus.'t00101'.b = INTEGER: inactive(2)
+NEC-NVR-CPU-MIB::necNvrCpuLocalMaintIfStatus.'t00116'.a = INTEGER: inactive(2)
+NEC-NVR-CPU-MIB::necNvrCpuLocalMaintIfStatus.'t00116'.b = INTEGER: inactive(2)
+NEC-NVR-CPU-MIB::necNvrCpuLocalMaintIfStatus.'t00117'.a = INTEGER: inactive(2)
+NEC-NVR-CPU-MIB::necNvrCpuLocalMaintIfStatus.'t00117'.b = INTEGER: inactive(2)
+11.	From PC B walk the NEC-NVR-LOCO-MIB on MC A:
+[tester@TSTPCB nvr-snmp-test-tool]$ snmpwalk -v3 10.213.120.4:1161 NEC-NVR-LOCO-MIB::necNvrLocoConfigFileUrl
+NEC-NVR-LOCO-MIB::necNvrLocoConfigFileUrl."07043".1 = STRING: "http://10.213.120.8/config7.5/loco_0001_v7.0.12-1_stage3_etc.tar.gz"
+NEC-NVR-LOCO-MIB::necNvrLocoConfigFileUrl."07047".1 = STRING: "http://10.213.120.8/config7.5/loco_0005_v7.0.12-1_stage3_etc.tar.gz"
+NEC-NVR-LOCO-MIB::necNvrLocoConfigFileUrl."07048".1 = STRING: http://10.213.120.8/config7.5/loco_0006_v7.5.0_stage3_etc.tar.gz
+
+12.	From PC B, prepare the locomotive configuration file for download by the NVR Terminal
+[tester@TSTPCB nvr-snmp-test-tool]$ python 118.downloadLocoConfig.py -u  http://10.213.120.4/config.5.1.7/loco_0030_v5.1.7_copy_etc.tar.gz -m 4ecc3568991fdb24a17a042c6cf587b6 -a 1 -s 4 07074 2
+NEC-NVR-LOCO-MIB::necNvrLocoConfigFileUrl."07074"."2" = http://10.213.120.4/config.5.1.7/loco_0030_v5.1.7_copy_etc.tar.gz
+NEC-NVR-LOCO-MIB::necNvrLocoConfigFileUserEnteredMd5."07074"."2" = 0x4ecc3568991fdb24a17a042c6cf587b6
+NEC-NVR-LOCO-MIB::necNvrLocoConfigFileAction."07074"."2" = 'idle'
+NEC-NVR-LOCO-MIB::necNvrLocoConfigFileRowStatus."07074"."2" = 'createAndGo'
+
+13.	From PC B walk the NEC-NVR-LOCO-MIB on MC A:
+[tester@TSTPCB nvr-snmp-test-tool]$ snmpwalk -v3 10.213.120.4:1161 NEC-NVR-LOCO-MIB::necNvrLocoConfigFileUrl
+NEC-NVR-LOCO-MIB::necNvrLocoConfigFileUrl."07043".1 = STRING: "http://10.213.120.8/config7.5/loco_0001_v7.0.12-1_stage3_etc.tar.gz"
+NEC-NVR-LOCO-MIB::necNvrLocoConfigFileUrl."07047".1 = STRING: "http://10.213.120.8/config7.5/loco_0005_v7.0.12-1_stage3_etc.tar.gz"
+NEC-NVR-LOCO-MIB::necNvrLocoConfigFileUrl."07048".1 = STRING: "http://10.213.120.8/config7.5/loco_0006_v7.5.0_stage3_etc.tar.gz"
+NEC-NVR-LOCO-MIB::necNvrLocoConfigFileUrl."07074".2 = STRING: "http://10.213.120.4/config.5.1.7/loco_0030_v5.1.7_copy_etc.tar.gz"
+---------------------------------------------
+2.	Switchover to NVR-MC B
+--------------------------
+1.	Check switchover status (Master/Slave) of two NVR-MC’s:
+[root@mca nvradm]# pcs status
+Cluster name: HA
+WARNING: corosync and pacemaker node names do not match (IPs used in setup?)
+Stack: corosync
+Current DC: mca (version 1.1.15-11.el7-e174ec8) - partition with quorum
+Last updated: Thu Sep 14 20:10:32 2017          Last change: Thu Sep 14 18:14:43 2017 by root via crm_attribute on mca
+
+2 nodes and 6 resources configured
+
+Online: [ mca mcb ]
+
+Full list of resources:
+
+ sharedIP       (ocf::heartbeat:IPaddr2):       Started mca
+ Master/Slave Set: ms_MySQL [p_mysql]
+     Masters: [ mca ]
+     Slaves: [ mcb ]
+ Clone Set: p_ping-clone [p_ping]
+     Started: [ mca mcb ]
+ p_nvrmc        (ocf::nvrmc:nvrmc):     Started mca
+
+Daemon Status:
+  corosync: active/enabled
+  pacemaker: active/enabled
+  pcsd: active/enabled
+
+2.	Kill nvrmc process on NVR-MC A.
+$ Adm.ksh> 2 > 1 > 2
+
+Stopping Cron jobs...
+Thu Sep 14 20:13:00 AEST 2017: Shutting down JBoss...
+Thu Sep 14 20:13:17 AEST 2017: JBoss stopped
+
+
+Operation completed <Press Return> 
+
+3.	Check switchover status (Master/Slave) of two NVR-MC’s:
+
+[nvradm@mca ~]$ sudo pcs status   
+[sudo] password for nvradm: 
+Cluster name: HA
+WARNING: corosync and pacemaker node names do not match (IPs used in setup?)
+Stack: corosync
+Current DC: mca (version 1.1.15-11.el7-e174ec8) - partition with quorum
+Last updated: Thu Sep 14 20:13:56 2017          Last change: Thu Sep 14 20:13:19 2017 by root via crm_attribute on mcb
+
+2 nodes and 6 resources configured
+
+Online: [ mca mcb ]
+
+Full list of resources:
+
+ sharedIP       (ocf::heartbeat:IPaddr2):       Started mcb
+ Master/Slave Set: ms_MySQL [p_mysql]
+     Masters: [ mcb ]
+     Slaves: [ mca ]
+ Clone Set: p_ping-clone [p_ping]
+     Started: [ mca mcb ]
+ p_nvrmc        (ocf::nvrmc:nvrmc):     Started mcb
+
+Failed Actions:
+* p_nvrmc_monitor_10000 on mca 'not running' (7): call=35, status=complete, exitreason='none',
+    last-rc-change='Thu Sep 14 20:13:18 2017', queued=0ms, exec=0ms
+
+
+Daemon Status:
+  corosync: active/enabled
+  pacemaker: active/enabled
+  pcsd: active/enabled
+
+----------------------------
+3.	Verify that the update is synchronised
+
+1.	From PC B walk the NEC-NVR-DG-MIB on MC B:
+[nvradm@mca root]$ ssh tester@10.213.120.8
+Last login: Thu Sep 14 15:35:17 2017 from 10.250.0.6
+[tester@TSTPCB ~]$ snmpwalk -v3 10.213.120.5:1161 NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00001'.1 = Gauge32: 1505301367
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00001'.2 = Gauge32: 0
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00001'.3 = Gauge32: 0
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00001'.4 = Gauge32: 0
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00001'.5 = Gauge32: 0
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00001'.6 = Gauge32: 0
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00001'.7 = Gauge32: 0
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00001'.8 = Gauge32: 0
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00002'.1 = Gauge32: 0
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00002'.2 = Gauge32: 0
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00002'.3 = Gauge32: 0
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00002'.4 = Gauge32: 0
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00002'.5 = Gauge32: 0
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00002'.6 = Gauge32: 0
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00002'.7 = Gauge32: 0
+NEC-NVR-DG-MIB::necNvrDgScriptFileStartTime.'g00002'.8 = Gauge32: 0
+
+2.	From PC B walk the NEC-NVR-MC-MIB on MC B:
+[tester@TSTPCB ~]$ snmpwalk -v3 10.213.120.5:1161 NEC-NVR-MC-MIB::necNvrMcLogFileLogLevel
+NEC-NVR-MC-MIB::necNvrMcLogFileLogLevel.'m00001' = INTEGER: 4
+NEC-NVR-MC-MIB::necNvrMcLogFileLogLevel.'m00002' = INTEGER: 4
+
+3.	From PC B walk the NEC-NVR-CPU-MIB on MC B:
+$ snmpwalk -v3 10.213.120.5:1161 NEC-NVR-CPU-MIB::necNvrCpuLocalMaintIfStatus
+[tester@TSTPCB ~]$ snmpwalk -v3 10.213.120.5:1161 NEC-NVR-CPU-MIB::necNvrCpuLocalMaintIfStatus
+NEC-NVR-CPU-MIB::necNvrCpuLocalMaintIfStatus.'t00101'.a = INTEGER: inactive(2)
+NEC-NVR-CPU-MIB::necNvrCpuLocalMaintIfStatus.'t00101'.b = INTEGER: inactive(2)
+NEC-NVR-CPU-MIB::necNvrCpuLocalMaintIfStatus.'t00116'.a = INTEGER: inactive(2)
+NEC-NVR-CPU-MIB::necNvrCpuLocalMaintIfStatus.'t00116'.b = INTEGER: inactive(2)
+NEC-NVR-CPU-MIB::necNvrCpuLocalMaintIfStatus.'t00117'.a = INTEGER: inactive(2)
+NEC-NVR-CPU-MIB::necNvrCpuLocalMaintIfStatus.'t00117'.b = INTEGER: inactive(2)
+
+4.	From PC B walk the NEC-NVR-LOCO-MIB on MC B:
+$ snmpwalk -v3 10.213.120.5:1161 NEC-NVR-LOCO-MIB::necNvrLocoConfigFileUrl
+[tester@TSTPCB ~]$ snmpwalk -v3 10.213.120.5:1161 NEC-NVR-LOCO-MIB::necNvrLocoConfigFileUrl
+NEC-NVR-LOCO-MIB::necNvrLocoConfigFileUrl."07043".1 = STRING: "http://10.213.120.8/config7.5/loco_0001_v7.0.12-2_stage3_etc.tar.gz"
+NEC-NVR-LOCO-MIB::necNvrLocoConfigFileUrl."07043".2 = STRING: "http://10.213.120.8/config7/loco_0001_x_ghcr-45s.tar.gz"
+NEC-NVR-LOCO-MIB::necNvrLocoConfigFileUrl."07047".1 = STRING: "http://10.213.120.8/config7.5/loco_0005_v7.0.12-2_stage3_etc.tar.gz"
+NEC-NVR-LOCO-MIB::necNvrLocoConfigFileUrl."07048".1 = STRING: "http://10.213.120.8/config7.5/loco_0006_v7.5.0_stage3_etc.tar.gz"
+NEC-NVR-LOCO-MIB::necNvrLocoConfigFileUrl."07074".2 = STRING: "http://10.213.120.4/config.5.1.7/loco_0030_v5.1.7_copy_etc.tar.gz"
+
+----------------------------
+4.	Recover the NVR MC (NVR MC A is master)
+1.	From MC A VM, check NVR MC A database via SNMP interface. 
+
+[nvradm@mca ~]$ snmpget -v 3 -u nvradm -l authPriv -a MD5 -A "nec12345" -x DES -X "nec12345" 10.213.120.4 'NET-SNMP-EXTEND-MIB::nsExtendOutputFull."get_database_status"'
+NET-SNMP-EXTEND-MIB::nsExtendOutputFull."get_database_status" = STRING: mysqlcheck: [Warning] Using a password on the command line interface can be insecure.
+mysql.columns_priv                                 OK
+mysql.db                                           OK
+mysql.engine_cost                                  OK
+mysql.event                                        OK
+mysql.func                                         OK
+mysql.general_log                                  OK
+mysql.gtid_executed                                OK
+mysql.help_category                                OK
+mysql.help_keyword                                 OK
+mysql.help_relation                                OK
+mysql.help_topic                                   OK
+mysql.innodb_index_stats                           OK
+mysql.innodb_table_stats                           OK
+mysql.ndb_binlog_index                             OK
+mysql.plugin                                       OK
+mysql.proc                                         OK
+mysql.procs_priv                                   OK
+mysql.proxies_priv                                 OK
+mysql.server_cost                                  OK
+mysql.servers                                      OK
+mysql.slave_master_info                            OK
+mysql.slave_relay_log_info                         OK
+mysql.slave_worker_info                            OK
+mysql.slow_log                                     OK
+mysql.tables_priv                                  OK
+mysql.time_zone                                    OK
+mysql.time_zone_leap_second                        OK
+mysql.time_zone_name                               OK
+mysql.time_zone_transition                         OK
+mysql.time_zone_transition_type                    OK
+mysql.user                                         OK
+nvrmc.component_version                            OK
+nvrmc.tblAlarm                                     OK
+nvrmc.tblBackup                                    OK
+nvrmc.tblBearer                                    OK
+nvrmc.tblConfig                                    OK
+nvrmc.tblConfigCheck                               OK
+nvrmc.tblCpu                                       OK
+nvrmc.tblCpuFirmwareUpdate                         OK
+nvrmc.tblCpuFirmwareVersion                        OK
+nvrmc.tblCpuScriptFile                             OK
+nvrmc.tblDgBearer                                  OK
+nvrmc.tblDgScriptFile                              OK
+nvrmc.tblDgServer                                  OK
+nvrmc.tblDgTrafficRole                             OK
+nvrmc.tblEndToEndComms                             OK
+nvrmc.tblLocalMainternanceInterface                OK
+nvrmc.tblLoco                                      OK
+nvrmc.tblLogFile                                   OK
+nvrmc.tblLogFileArchive                            OK
+nvrmc.tblLogFileRetrieval                          OK
+nvrmc.tblLogFileUpload                             OK
+nvrmc.tblMcScriptFile                              OK
+nvrmc.tblMcServer                                  OK
+nvrmc.tblPeripheral                                OK
+nvrmc.tblScheduleFirmwareUpdate                    OK
+nvrmc.tblScriptFileExecution                       OK
+nvrmc.tblTerminal                                  OK
+nvrmc.tblTerminalTrafficRole                       OK
+nvrmc.tblTrafficCounter                            OK
+sys.sys_config                                     OK
+
+2.	Recover the MC A database by replicating MC B database.
+[nvradm@mca-103 ~]$ snmpset -v 3 -u nvradm -l authPriv -a MD5 -A "nec12345" -x DES -X "nec12345" 10.213.120.4 'NET-SNMP-EXTEND-MIB::nsExtendRunType."configure_replicationFix"' i 3
+
+NET-SNMP-EXTEND-MIB::nsExtendRunType."configure_replicationFix" = INTEGER: run-command(3)
+
+3.	Confirm database replication is successful.
+$ snmpget -v 3 -u nvradm -l authPriv -a MD5 -A "nec12345" -x DES -X "nec12345" 10.213.120.4 'NET-SNMP-EXTEND-MIB::nsExtendOutputFull."get_database_replication"'
+NET-SNMP-EXTEND-MIB::nsExtendOutputFull."get_database_replication" = STRING: success
+
+Observe log
+=========================
+[2017/09/14 20:22:54] SNMP request configure replication
+[2017/09/14 20:22:55] [R] Checking Corosync status
+[2017/09/14 20:22:55] [R] Cluster name: HA
+WARNING: corosync and pacemaker node names do not match (IPs used in setup?)
+Stack: corosync
+Current DC: mca (version 1.1.15-11.el7-e174ec8) - partition with quorum
+Last updated: Thu Sep 14 20:22:55 2017          Last change: Thu Sep 14 20:13:19 2017 by root via crm_attribute on mcb
+
+2 nodes and 6 resources configured
+
+Online: [ mca mcb ]
+
+Full list of resources:
+
+ sharedIP       (ocf::heartbeat:IPaddr2):       Started mcb
+ Master/Slave Set: ms_MySQL [p_mysql]
+     Masters: [ mcb ]
+     Slaves: [ mca ]
+ Clone Set: p_ping-clone [p_ping]
+     Started: [ mca mcb ]
+ p_nvrmc        (ocf::nvrmc:nvrmc):     Started mcb
+
+Failed Actions:
+* p_nvrmc_monitor_10000 on mca 'not running' (7): call=35, status=complete, exitreason='none',
+    last-rc-change='Thu Sep 14 20:13:18 2017', queued=0ms, exec=0ms
+
+
+Daemon Status:
+  corosync: active/enabled
+  pacemaker: active/enabled
+  pcsd: active/enabled
+[2017/09/14 20:22:58] [R] Connection between MC A and MC B: OK
+[2017/09/14 20:22:58] [R] Re-configure Replication
+[2017/09/14 20:22:58] [R] Service Corosync stop on MC A: Stopping
+[2017/09/14 20:23:29] [R] Service Corosync stop on MC A: Stopping
+[2017/09/14 20:23:59] [R] Service Corosync stop on MC A: Success
+[2017/09/14 20:23:59] [R] Connection between MC A and MC B: OK
+[2017/09/14 20:24:00] [R] Service Corosync stop on MC B: Stopping
+[2017/09/14 20:24:00] [R] Connection between MC A and MC B: OK
+[2017/09/14 20:24:30] [R] Service Corosync stop on MC B: Stopping
+[2017/09/14 20:24:31] [R] Connection between MC A and MC B: OK
+[2017/09/14 20:25:01] [R] Connection between MC A and MC B: OK
+[2017/09/14 20:25:01] [R] Service Corosync stop on MC B: Success
+[2017/09/14 20:25:01] [R] Connection between MC A and MC B: OK
+[2017/09/14 20:25:03] [R] Service MySQL start on MC B: Success
+[2017/09/14 20:25:03] [R] Check all databases status on MC B:
+mysql.columns_priv                                 OK
+mysql.db                                           OK
+mysql.engine_cost                                  OK
+mysql.event                                        OK
+mysql.func                                         OK
+mysql.general_log                                  OK
+mysql.gtid_executed                                OK
+mysql.help_category                                OK
+mysql.help_keyword                                 OK
+mysql.help_relation                                OK
+mysql.help_topic                                   OK
+mysql.innodb_index_stats                           OK
+mysql.innodb_table_stats                           OK
+mysql.ndb_binlog_index                             OK
+mysql.plugin                                       OK
+mysql.proc                                         OK
+mysql.procs_priv                                   OK
+mysql.proxies_priv                                 OK
+mysql.server_cost                                  OK
+mysql.servers                                      OK
+mysql.slave_master_info                            OK
+mysql.slave_relay_log_info                         OK
+mysql.slave_worker_info                            OK
+mysql.slow_log                                     OK
+mysql.tables_priv                                  OK
+mysql.time_zone                                    OK
+mysql.time_zone_leap_second                        OK
+mysql.time_zone_name                               OK
+mysql.time_zone_transition                         OK
+mysql.time_zone_transition_type                    OK
+mysql.user                                         OK
+nvrmc.component_version                            OK
+nvrmc.tblAlarm                                     OK
+nvrmc.tblBackup                                    OK
+nvrmc.tblBearer                                    OK
+nvrmc.tblConfig                                    OK
+nvrmc.tblConfigCheck                               OK
+nvrmc.tblCpu                                       OK
+nvrmc.tblCpuFirmwareUpdate                         OK
+nvrmc.tblCpuFirmwareVersion                        OK
+nvrmc.tblCpuScriptFile                             OK
+nvrmc.tblDgBearer                                  OK
+nvrmc.tblDgScriptFile                              OK
+nvrmc.tblDgServer                                  OK
+nvrmc.tblDgTrafficRole                             OK
+nvrmc.tblEndToEndComms                             OK
+nvrmc.tblLocalMainternanceInterface                OK
+nvrmc.tblLoco                                      OK
+nvrmc.tblLogFile                                   OK
+nvrmc.tblLogFileArchive                            OK
+nvrmc.tblLogFileRetrieval                          OK
+nvrmc.tblLogFileUpload                             OK
+nvrmc.tblMcScriptFile                              OK
+nvrmc.tblMcServer                                  OK
+nvrmc.tblPeripheral                                OK
+nvrmc.tblScheduleFirmwareUpdate                    OK
+nvrmc.tblScriptFileExecution                       OK
+nvrmc.tblTerminal                                  OK
+nvrmc.tblTerminalTrafficRole                       OK
+nvrmc.tblTrafficCounter                            OK
+sys.sys_config                                     OK
+[2017/09/14 20:25:03] [R] MySQL dump file on MC B: Success
+[2017/09/14 20:25:03] [R] Connection between MC A and MC B: OK
+[2017/09/14 20:25:03] [R] Connection between MC A and MC B: OK
+[2017/09/14 20:25:04] [R] Tranfer the dump file to MC A: Success
+[2017/09/14 20:25:05] [R] Service MySQL start on MC A: Success
+[2017/09/14 20:25:06] [R] Check all databases status on MC A:
+mysql.columns_priv                                 OK
+mysql.db                                           OK
+mysql.engine_cost                                  OK
+mysql.event                                        OK
+mysql.func                                         OK
+mysql.general_log                                  OK
+mysql.gtid_executed                                OK
+mysql.help_category                                OK
+mysql.help_keyword                                 OK
+mysql.help_relation                                OK
+mysql.help_topic                                   OK
+mysql.innodb_index_stats                           OK
+mysql.innodb_table_stats                           OK
+mysql.ndb_binlog_index                             OK
+mysql.plugin                                       OK
+mysql.proc                                         OK
+mysql.procs_priv                                   OK
+mysql.proxies_priv                                 OK
+mysql.server_cost                                  OK
+mysql.servers                                      OK
+mysql.slave_master_info                            OK
+mysql.slave_relay_log_info                         OK
+mysql.slave_worker_info                            OK
+mysql.slow_log                                     OK
+mysql.tables_priv                                  OK
+mysql.time_zone                                    OK
+mysql.time_zone_leap_second                        OK
+mysql.time_zone_name                               OK
+mysql.time_zone_transition                         OK
+mysql.time_zone_transition_type                    OK
+mysql.user                                         OK
+nvrmc.component_version                            OK
+nvrmc.tblAlarm                                     OK
+nvrmc.tblBackup                                    OK
+nvrmc.tblBearer                                    OK
+nvrmc.tblConfig                                    OK
+nvrmc.tblConfigCheck                               OK
+nvrmc.tblCpu                                       OK
+nvrmc.tblCpuFirmwareUpdate                         OK
+nvrmc.tblCpuFirmwareVersion                        OK
+nvrmc.tblCpuScriptFile                             OK
+nvrmc.tblDgBearer                                  OK
+nvrmc.tblDgScriptFile                              OK
+nvrmc.tblDgServer                                  OK
+nvrmc.tblDgTrafficRole                             OK
+nvrmc.tblEndToEndComms                             OK
+nvrmc.tblLocalMainternanceInterface                OK
+nvrmc.tblLoco                                      OK
+nvrmc.tblLogFile                                   OK
+nvrmc.tblLogFileArchive                            OK
+nvrmc.tblLogFileRetrieval                          OK
+nvrmc.tblLogFileUpload                             OK
+nvrmc.tblMcScriptFile                              OK
+nvrmc.tblMcServer                                  OK
+nvrmc.tblPeripheral                                OK
+nvrmc.tblScheduleFirmwareUpdate                    OK
+nvrmc.tblScriptFileExecution                       OK
+nvrmc.tblTerminal                                  OK
+nvrmc.tblTerminalTrafficRole                       OK
+nvrmc.tblTrafficCounter                            OK
+sys.sys_config                                     OK
+[2017/09/14 20:25:14] [R] MySQL restore database on MC A: Success
+[2017/09/14 20:25:14] [R] MySQL Replication on MC A: Success
+[2017/09/14 20:25:14] [R] Connection between MC A and MC B: OK
+[2017/09/14 20:25:15] [R] MySQL Replication on MC B: Success
+[2017/09/14 20:25:15] [R] Connection between MC A and MC B: OK
+[2017/09/14 20:25:15] [R] Service MySQL stop on MC B: Stopping
+[2017/09/14 20:25:26] [R] Service MySQL stop on MC B: Stopping
+[2017/09/14 20:25:36] [R] Connection between MC A and MC B: OK
+[2017/09/14 20:25:36] [R] Service MySQL stop on MC B: Success
+[2017/09/14 20:25:37] [R] Service MySQL stop on MC A: Stopping
+[2017/09/14 20:25:47] [R] Service MySQL stop on MC A: Stopping
+[2017/09/14 20:25:57] [R] Service MySQL stop on MC A: Stopping
+[2017/09/14 20:26:08] [R] Service MySQL stop on MC A: Success
+[2017/09/14 20:26:08] [R] rsync /nec/nvrmc/nvrmc/config/ato-nbi.conf: Success
+[2017/09/14 20:26:08] [R] rsync /nec/nvrmc/config/: Success
+[2017/09/14 20:26:09] [R] rsync /nec/nvrmc/logfile/: Success
+[2017/09/14 20:26:09] [R] rsync /nec/nvrmc/firmwareupdate/: Success
+[2017/09/14 20:26:09] [R] MySQL Replication is configured successfully on both Servers
+
+4.	Start corosync on MC A
+[nvradm@mca ~]$ snmpset -v 3 -u nvradm -l authPriv -a MD5 -A "nec12345" -x DES -X "nec12345" 10.213.120.4 'NET-SNMP-EXTEND-MIB::nsExtendRunType."start_corosyncFix"' i 3
+Timeout: No Response from 10.213.120.4
+
+5.	Confirm corosync has started.
+[nvradm@mca ~]$ snmpget -v 3 -u nvradm -l authPriv -a MD5 -A "nec12345" -x DES -X "nec12345" 10.213.120.4 'NET-SNMP-EXTEND-MIB::nsExtendOutputFull."get_corosync"'
+NET-SNMP-EXTEND-MIB::nsExtendOutputFull."get_corosync" = STRING: success
+
+Observe log:
+
+[2017/09/14 20:34:29] SNMP request start corosync
+[2017/09/14 20:34:30] [C] Checking Corosync status
+[2017/09/14 20:34:30] [C] 
+[2017/09/14 20:34:31] [C] Start Corosync on both Servers
+[2017/09/14 20:34:31] [C] Connection between MC A and MC B: OK
+[2017/09/14 20:34:32] [C] Service Corosync stop on MC A: Stopping
+[2017/09/14 20:35:02] [C] Service Corosync stop on MC A: Stopping
+[2017/09/14 20:35:33] [C] Service Corosync stop on MC A: Success
+[2017/09/14 20:36:06] [C] Service Corosync start on MC A: Starting
+[2017/09/14 20:36:38] [C] Service Corosync start on MC A: Starting
+[2017/09/14 20:36:38] [C] Service Corosync start on MC A: Success
+[2017/09/14 20:36:38] [C] Connection between MC A and MC B: OK
+[2017/09/14 20:37:12] [C] Connection between MC A and MC B: OK
+[2017/09/14 20:37:12] [C] Service Corosync start on MC B: Starting
+[2017/09/14 20:37:12] [C] Service Corosync start on MC B: Success
+[2017/09/14 20:37:12] [C] System is recovered successfully
+[2017/09/14 20:37:12] [C] Checking Corosync status
+[2017/09/14 20:37:12] [C] Cluster name: HA
+WARNING: corosync and pacemaker node names do not match (IPs used in setup?)
+Stack: corosync
+Current DC: mca (version 1.1.15-11.el7-e174ec8) - partition with quorum
+Last updated: Thu Sep 14 20:37:12 2017          Last change: Thu Sep 14 20:36:02 2017 by root via crm_attribute on mca
+
+2 nodes and 6 resources configured
+
+Online: [ mca mcb ]
+
+Full list of resources:
+
+ sharedIP       (ocf::heartbeat:IPaddr2):       Started mca
+ Master/Slave Set: ms_MySQL [p_mysql]
+     Masters: [ mca ]
+     Slaves: [ mcb ]
+ Clone Set: p_ping-clone [p_ping]
+     Started: [ mca mcb ]
+ p_nvrmc        (ocf::nvrmc:nvrmc):     Started mca
+
+Daemon Status:
+  corosync: active/enabled
+  pacemaker: active/enabled
+  pcsd: active/enabled
+  
+6.	Confirm that MC A is now master.
+[nvradm@mca ~]$ snmpget -v 3 -u nvradm -l authPriv -a MD5 -A "nec12345" -x DES -X "nec12345" 10.213.120.4 'NET-SNMP-EXTEND-MIB::nsExtendOutputFull."get_ha_status"'
+NET-SNMP-EXTEND-MIB::nsExtendOutputFull."get_ha_status" = STRING: Cluster name: HA
+WARNING: corosync and pacemaker node names do not match (IPs used in setup?)
+Stack: corosync
+Current DC: mca (version 1.1.15-11.el7-e174ec8) - partition with quorum
+Last updated: Thu Sep 14 20:38:33 2017          Last change: Thu Sep 14 20:36:02 2017 by root via crm_attribute on mca
+
+2 nodes and 6 resources configured
+
+Online: [ mca mcb ]
+
+Full list of resources:
+
+ sharedIP       (ocf::heartbeat:IPaddr2):       Started mca
+ Master/Slave Set: ms_MySQL [p_mysql]
+     Masters: [ mca ]
+     Slaves: [ mcb ]
+ Clone Set: p_ping-clone [p_ping]
+     Started: [ mca mcb ]
+ p_nvrmc        (ocf::nvrmc:nvrmc):     Started mca
+
+Daemon Status:
+  corosync: active/enabled
+  pacemaker: active/enabled
+  pcsd: active/enabled
+
+7.	Check database replication status.
+[nvradm@mca ~]$ snmpget -v 3 -u nvradm -l authPriv -a MD5 -A "nec12345" -x DES -X "nec12345" 10.213.120.4 'NET-SNMP-EXTEND-MIB::nsExtendOutputFull."get_mysql_slave_status"'
+NET-SNMP-EXTEND-MIB::nsExtendOutputFull."get_mysql_slave_status" = STRING: *************************** 1. row ***************************
+               Slave_IO_State: Waiting for master to send event
+                  Master_Host: mca
+                  Master_User: root
+                  Master_Port: 3306
+                Connect_Retry: 60
+              Master_Log_File: mysql-bin.000072
+          Read_Master_Log_Pos: 140764
+               Relay_Log_File: slave-relay-bin.000005
+                Relay_Log_Pos: 140977
+        Relay_Master_Log_File: mysql-bin.000072
+             Slave_IO_Running: Yes
+            Slave_SQL_Running: Yes
+              Replicate_Do_DB: 
+          Replicate_Ignore_DB: 
+           Replicate_Do_Table: 
+       Replicate_Ignore_Table: 
+      Replicate_Wild_Do_Table: 
+  Replicate_Wild_Ignore_Table: 
+                   Last_Errno: 0
+                   Last_Error: 
+                 Skip_Counter: 0
+          Exec_Master_Log_Pos: 140764
+              Relay_Log_Space: 141350
+              Until_Condition: None
+               Until_Log_File: 
+                Until_Log_Pos: 0
+           Master_SSL_Allowed: No
+           Master_SSL_CA_File: 
+           Master_SSL_CA_Path: 
+              Master_SSL_Cert: 
+            Master_SSL_Cipher: 
+               Master_SSL_Key: 
+        Seconds_Behind_Master: 0
+Master_SSL_Verify_Server_Cert: No
+                Last_IO_Errno: 0
+                Last_IO_Error: 
+               Last_SQL_Errno: 0
+               Last_SQL_Error: 
+  Replicate_Ignore_Server_Ids: 
+             Master_Server_Id: 1
+                  Master_UUID: e2a9b730-6b4e-11e7-87d9-525400b0c6b0
+             Master_Info_File: /var/lib/mysql/master.info
+                    SQL_Delay: 0
+          SQL_Remaining_Delay: NULL
+      Slave_SQL_Running_State: Slave has read all relay log; waiting for more updates
+           Master_Retry_Count: 86400
+                  Master_Bind: 
+      Last_IO_Error_Timestamp: 
+     Last_SQL_Error_Timestamp: 
+               Master_SSL_Crl: 
+           Master_SSL_Crlpath: 
+           Retrieved_Gtid_Set: 
+            Executed_Gtid_Set: 
+                Auto_Position: 0
+         Replicate_Rewrite_DB: 
+                 Channel_Name: 
+           Master_TLS_Version: 
+
+8.	Check the status of MC A.
+[nvradm@mca ~]$ snmpget -v 3 -u nvradm -l authPriv -a MD5 -A "nec12345" -x DES -X "nec12345" 10.213.120.4 'NET-SNMP-EXTEND-MIB::nsExtendOutputFull."get_database_status"'
+NET-SNMP-EXTEND-MIB::nsExtendOutputFull."get_database_status" = STRING: mysqlcheck: [Warning] Using a password on the command line interface can be insecure.
+mysql.columns_priv                                 OK
+mysql.db                                           OK
+mysql.engine_cost                                  OK
+mysql.event                                        OK
+mysql.func                                         OK
+mysql.general_log                                  OK
+mysql.gtid_executed                                OK
+mysql.help_category                                OK
+mysql.help_keyword                                 OK
+mysql.help_relation                                OK
+mysql.help_topic                                   OK
+mysql.innodb_index_stats                           OK
+mysql.innodb_table_stats                           OK
+mysql.ndb_binlog_index                             OK
+mysql.plugin                                       OK
+mysql.proc                                         OK
+mysql.procs_priv                                   OK
+mysql.proxies_priv                                 OK
+mysql.server_cost                                  OK
+mysql.servers                                      OK
+mysql.slave_master_info                            OK
+mysql.slave_relay_log_info                         OK
+mysql.slave_worker_info                            OK
+mysql.slow_log                                     OK
+mysql.tables_priv                                  OK
+mysql.time_zone                                    OK
+mysql.time_zone_leap_second                        OK
+mysql.time_zone_name                               OK
+mysql.time_zone_transition                         OK
+mysql.time_zone_transition_type                    OK
+mysql.user                                         OK
+nvrmc.component_version                            OK
+nvrmc.tblAlarm                                     OK
+nvrmc.tblBackup                                    OK
+nvrmc.tblBearer                                    OK
+nvrmc.tblConfig                                    OK
+nvrmc.tblConfigCheck                               OK
+nvrmc.tblCpu                                       OK
+nvrmc.tblCpuFirmwareUpdate                         OK
+nvrmc.tblCpuFirmwareVersion                        OK
+nvrmc.tblCpuScriptFile                             OK
+nvrmc.tblDgBearer                                  OK
+nvrmc.tblDgScriptFile                              OK
+nvrmc.tblDgServer                                  OK
+nvrmc.tblDgTrafficRole                             OK
+nvrmc.tblEndToEndComms                             OK
+nvrmc.tblLocalMainternanceInterface                OK
+nvrmc.tblLoco                                      OK
+nvrmc.tblLogFile                                   OK
+nvrmc.tblLogFileArchive                            OK
+nvrmc.tblLogFileRetrieval                          OK
+nvrmc.tblLogFileUpload                             OK
+nvrmc.tblMcScriptFile                              OK
+nvrmc.tblMcServer                                  OK
+nvrmc.tblPeripheral                                OK
+nvrmc.tblScheduleFirmwareUpdate                    OK
+nvrmc.tblScriptFileExecution                       OK
+nvrmc.tblTerminal                                  OK
+nvrmc.tblTerminalTrafficRole                       OK
+nvrmc.tblTrafficCounter                            OK
+sys.sys_config                                     OK
